@@ -1,0 +1,80 @@
+---
+- name: Check EC2 instance state based on instance ID
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - group_vars/all/ansiblePlaybook-instance/vars.yml
+
+  tasks:
+    - name: Gather information about all instances
+      amazon.aws.ec2_instance_info:
+      register: ec2_info_all
+
+    - name: Filter my instance
+      set_fact:
+        my_instance: "{{ ec2_info_all.instances | selectattr('instance_id','equalto', ec2_instance_id) | list }}"
+
+    # For your reference
+    - name: Debug my instance
+      debug:
+        var: my_instance
+
+    - name: Start instance if stopped
+      amazon.aws.ec2_instance:
+        instance_ids: ["{{ ec2_instance_id }}"]
+        state: running
+      when: my_instance[0].state.name == "stopped"
+
+    - name: Wait until instance is running
+      amazon.aws.ec2_instance_info:
+        instance_ids: ["{{ ec2_instance_id }}"]
+      register: ec2_info_running
+      retries: 5
+      delay: 10
+      until: ec2_info_running.instances[0].state.name == "running"
+
+    - name: Gather info after starting
+      amazon.aws.ec2_instance_info:
+        instance_ids: ["{{ ec2_instance_id }}"]
+      register: my_instance_after_start
+
+      #For my reference after starting
+    - name: Show instance info
+      debug:
+        msg: "Instance ID: {{ my_instance_after_start.instances[0].instance_id }}, State: {{ my_instance_after_start.instances[0].state.name }}, Public IP: {{ my_instance_after_start.instances[0].public_ip_address | default('No Public IP') }}"
+      when: my_instance_after_start.instances | length > 0
+
+  
+
+    #- name: Execute if instance is running
+    #  debug:
+    #    msg: "Instance {{ ec2_instance_id }} is running. Executing task for running instance."
+    #  when: my_instance[0].state.name == "running"
+    
+ 
+    #- name: Display the available instances
+    #  debug:
+    #    msg: |
+    #      {% for inst in ec2_info_all.instances %}
+    #      Instance ID: {{ inst.instance_id }}
+    #      State: {{ inst.state.name }}
+    #      Key Name: {{ inst.key_name | default('No Key') }}
+    #      {% endfor %}
+    # ignore_errors: yes
+
+    #- name: Gather information about instances in shutting-down/stopping/stopped states
+    #  amazon.aws.ec2_instance_info:
+    #    filters:
+    #      instance-state-name: ["shutting-down", "stopping", "stopped"]
+    #  register: ec2_info
+
+    #- name: Show public IPs and states of all instances
+    #  debug:
+    #    msg: |
+    #      {% for inst in ec2_info.instances %}
+    #      Instance ID: {{ inst.instance_id }}
+    #      State: {{ inst.state.name }}
+    #      Public IP: {{ inst.public_ip_address | default('No Public IP') }}
+    #      {% endfor %}
+    #  ignore_errors: yes
