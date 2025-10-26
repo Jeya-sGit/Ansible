@@ -15,7 +15,7 @@
       set_fact:
         my_instance: "{{ ec2_info_all.instances | selectattr('instance_id','equalto', ec2_instance_id) | list }}"
 
-    # For your reference
+    # For my reference
     - name: Debug my instance
       debug:
         var: my_instance
